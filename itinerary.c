@@ -72,9 +72,10 @@ void* Studying(void* vargp){
 }
 
 void* BusMove(void* vargp){
-  printf("Bus is on the way to %s\n\n",vargp);
+  sleep(3);
+  printf("\nBus is on the way to %s\n",vargp);
   sleep(T);
-  printf("Bus arrived at %s\n\n",vargp);
+  printf("\nBus arrived at %s\n",vargp);
 }
 
 int main(){
@@ -87,13 +88,22 @@ int main(){
     return 1;
   }
   pthread_mutex_init(&mutex,NULL);
-  //pthread_create(&bus,NULL,BusMove,"University");
+  if(pthread_create(&bus,NULL,BusMove,"University")!=0){
+    perror("Failed to create bus thread\n");
+  }
   pthread_t students[NoS]; //Declare student threads
   for(i=0;i<NoS;i++){
-    pthread_create(&students[i],NULL,Studying,NULL);
+    if( pthread_create(&students[i],NULL,&Studying,NULL) != 0){
+      perror("Failed to create student thread\n");
+    }
   }
   for(i=0;i<NoS;i++){
-    pthread_join(students[i],NULL);
+    if (pthread_join(students[i],NULL) != 0){
+      perror("Failed to join student thread\n");
+    }
+  }
+  if(pthread_join(bus,NULL) != 0){
+    perror("Failed to join bus thread\n");
   }
   /* while(StopA!=NULL){
     printf("\nStudent %d (%s) boarded to the bus.\n",StopA->uid,Departments[StopA->department]);
@@ -114,6 +124,6 @@ int main(){
       temp->next->next = NULL;
   }*/
   pthread_mutex_destroy(&mutex);
-  puts("All students from stop A went to the University and came back");
+  puts("\nAll students from stop A went to the University and came back");
   return 0;
 }
