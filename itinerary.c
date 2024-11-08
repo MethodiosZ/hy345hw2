@@ -21,6 +21,7 @@ sem_t arrival;
 sem_t boarding;
 sem_t nextroute;
 sem_t stopb;
+sem_t returning;
 int count=0;
 int globalpos=0;
 int MaxDepInBus[] = {0,0,0,0};
@@ -130,14 +131,14 @@ void* Studying(void* vargp){
   printLists();
   pthread_mutex_unlock(&mutex);
   sem_post(&stopb);
-  sem_wait(&boarding);
+  sem_wait(&returning);
   printf("\nStudent %d (%s) went home.\n",id,Departments[dep]);
   Bus[id] = "_";
   count--;
   pthread_mutex_lock(&mutex);
   printLists();
   pthread_mutex_unlock(&mutex);
-  sem_post(&boarding);
+  sem_post(&returning);
   return NULL;
 }
 
@@ -148,6 +149,7 @@ void* BusMove(void* vargp){
     puts("\nBus is on the way to University");
     sleep(T); //Bus is moving
     puts("\nBus arrived at University");
+    sem_wait(&returning);
     sem_post(&stopb);
     pthread_mutex_lock(&mutex);
     printLists();
@@ -160,7 +162,7 @@ void* BusMove(void* vargp){
     sleep(T); //Bus is moving
     puts("\nBus arrived at stop A");
     sem_post(&nextroute);
-    sem_post(&boarding);
+    sem_post(&returning);
   }
   return NULL;
 }
@@ -180,6 +182,7 @@ int main(){
   sem_init(&boarding,0,0);
   sem_init(&nextroute,0,0);
   sem_init(&stopb,0,0);
+  sem_init(&returning,0,1);
   for(i=0;i<200;i++){
     StopA[i] = "\0";
     Bus[i] = "\0";
@@ -209,6 +212,7 @@ int main(){
   sem_destroy(&boarding);
   sem_destroy(&nextroute);
   sem_destroy(&stopb);
+  sem_destroy(&returning);
   puts("\nAll students from stop A went to the University and came back");
   return 0;
 }
