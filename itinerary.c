@@ -4,26 +4,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <string.h>
 
 #define N 4
 #define T 10
 
 char* Departments[] = {"Math","Physics","Chemistry","CSD"};
+char* StopA[200];
+char* Bus[200];
+char* StopB[200];
+char* University[200];
 
-typedef enum {
-  MATH,
-  PHYSICS,
-  CHEMISTRY,
-  CSD
-} departments_t;
-
-typedef struct Student{
-  int uid;
-  departments_t department;
-  struct Student *next;
-}student;
-
-student *StopA = NULL, *Bus = NULL, *University = NULL, *StopB = NULL; //Initialize lists for StopA, Bus, University, StopB
 pthread_mutex_t mutex;
 pthread_barrier_t barrier;
 sem_t arrival;
@@ -31,180 +22,114 @@ sem_t boarding;
 sem_t nextroute;
 sem_t stopb;
 int count=0;
-int BusLOcation = 1; //1 for StopA / 2 for StopB
 int globalpos=0;
 int MaxDepInBus[] = {0,0,0,0};
 
-void printList(student* list){
-  while(list!=NULL){
-    printf(" [%d, %s]",list->uid,Departments[list->department]);
-    list = list->next;
-  }
-}
-
 void printLists(){
+  int i = 1;
   printf("\nStop A:"); //print Stop A list
-  printList(StopA);
-  printf("\nBus:"); //print Bus list
-  printList(Bus);
-  printf("\nUniversity:"); //print University list
-  printList(University);
-  printf("\nStopB:"); //print Stop B list
-  printList(StopB);
-  printf("\n");
-}
-
-void AddAndRemoveToList(student* addlist,student* removelist,student* elem){
-  if(addlist==NULL){
-    addlist = elem;
-    removelist = removelist->next;
-    addlist->next = NULL;
-  } else {
-    student* temp = addlist;
-    while(temp->next!=NULL){
-      temp = temp->next;
+  while(strcmp(StopA[i],"\0")!=0){
+    if(strcmp(StopA[i],"_")!=0){
+      printf(" [%d, %s]",i,StopA[i]);
     }
-    temp->next = elem;
-    student* rem = removelist;
-    student* prev;
-    while(rem->uid!=elem->uid){
-      prev=rem;
-      rem=rem->next;
-    }
-    prev->next = rem->next;
-    temp->next->next = NULL;
+    i++;
   }
+  printf("\nBus:"); //print Bus list
+  i=1;
+  while(strcmp(Bus[i],"\0")!=0){
+    if(strcmp(Bus[i],"_")!=0){
+      printf(" [%d, %s]",i,Bus[i]);
+    }
+    i++;
+  }
+  printf("\nUniversity:"); //print University list
+  i=1;
+  while(strcmp(University[i],"\0")!=0){
+    if(strcmp(University[i],"_")!=0){
+      printf(" [%d, %s]",i,University[i]);
+    }
+    i++;
+  }
+  printf("\nStopB:"); //print Stop B list
+  i=1;
+  while(strcmp(StopB[i],"\0")!=0){
+    if(strcmp(StopB[i],"_")!=0){
+      printf(" [%d, %s]",i,StopB[i]);
+    }
+    i++;
+  }
+  printf("\n");
 }
 
 void* Studying(void* vargp){
   int studytime = rand() % (15-5+1) + 5;
   int dep = rand() % (3+1);
-  int id,position=1;
+  int id,position=1; //1 for stopA, 2 for Bus, 3 for stopB, 4 for University
   pthread_mutex_lock(&mutex); //lock is needed to keep count stable
   printf("\nStudent %d (%s) created.\n",1+count++,Departments[dep]);
-  student *new = (student*)malloc(sizeof(student));
   id = count;
-  new->uid = count;
-  new->department = dep;
-  new->next = NULL;
-  if(StopA==NULL) StopA=new; //add students to StopA
-  else {
-    student* temp = StopA;
-    while(temp->next!=NULL){
-      temp = temp->next;
-    }
-    temp->next = new;
-  }
+  StopA[id] = Departments[dep];
   printLists();
   pthread_mutex_unlock(&mutex);
   pthread_barrier_wait(&barrier);
-  student* temp = StopA;
-  while(temp->uid!=id){
-    temp=temp->next;
-    position++;
-  }
-  while(position>1+globalpos){
+  while(id>1+globalpos){
     sem_wait(&boarding);
     sem_post(&boarding);
   }
-  if(Bus==NULL){
-    printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
-    MaxDepInBus[dep]++;
-    Bus = temp;
-    StopA = StopA->next;
-    Bus->next = NULL;
-    printLists();
-    globalpos++;
-    sem_post(&boarding);
-  } else if(MaxDepInBus[dep]>=N/4) {
+  if(MaxDepInBus[dep]>=N/4) {
     printf("\nStudent %d (%s) cannot enter the bus\n",id,Departments[dep]);
+    Bus[id] = "_";
+    StopB[id] = "_";
+    University[id] = "_";
     globalpos++;
     sem_post(&boarding);
     sem_wait(&nextroute);
+    printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
+    Bus[id] = Departments[dep];
+    StopA[id] = "_";
+    printLists();
   } else {
     printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
-    MaxDepInBus[temp->department]++;
-    student* new = Bus;
-    while(new->next!=NULL){
-      new = new->next;
-    }
-    new->next = temp;
-    student* rem = StopA,*prev=StopA;
-    while(rem->uid!=temp->uid){
-      prev=rem;
-      rem=rem->next;
-    }
-    if(prev->uid==rem->uid){
-      prev = prev->next;
-    } else {
-      prev->next = rem->next;
-    }
-    new->next->next = NULL;
-    printLists();
+    Bus[id] = Departments[dep];
+    StopA[id] = "_";
+    MaxDepInBus[dep]++;
     globalpos++;
+    printLists();
     sem_post(&boarding);
   }
   sem_wait(&arrival);
-  if(StopB==NULL){
-    printf("\nStudent %d (%s) got off the bus.\n",id,Departments[dep]);
-    StopB = temp;
-    Bus = Bus->next;
-    StopB->next =NULL;
-    printLists();
-    sem_post(&arrival);
-  } else {
-    printf("\nStudent %d (%s) got off the bus.\n",id,Departments[dep]);
-    student* new = StopB;
-    while(new->next!=NULL){
-      new = new->next;
-    }
-    new->next = temp; //FIX BUS LIST
-    new->next->next = NULL;
-    printLists();
-    sem_post(&arrival);
-  }
-  if(University==NULL){
-    printf("\nStudent %d (%s) went to University.\n",id,Departments[dep]);
-    University = temp;
-    StopB = StopB->next;
-    University->next = NULL;
-    printLists();
-  } else {
-    printf("\nStudent %d (%s) went to University.\n",id,Departments[dep]);
-    student* new = University;
-    while(new->next!=NULL){
-      new = new->next;
-    }
-    new->next = temp; //FIX STOP B LIST
-    new->next->next = NULL;
-    printLists();
-  }
+  printf("\nStudent %d (%s) got off the bus.\n",id,Departments[dep]);
+  StopB[id] = Departments[dep];
+  Bus[id] = "_";
+  printLists();
+  sem_post(&arrival);
+  printf("\nStudent %d (%s) went to University.\n",id,Departments[dep]);
+  StopB[id] = "_";
+  University[id] = Departments[dep];
+  printLists();
   sleep(studytime);
-  if(StopB==NULL){
-    printf("\nStudent %d (%s) studied for %d seconds, and now is heading to Stop B\n",id,Departments[dep],studytime);
-    StopB = temp;
-    University = University->next;
-    StopB->next = NULL;
-    printLists();
-  } else {
-    printf("\nStudent %d (%s) studied for %d seconds, and now is heading to Stop B\n",id,Departments[dep],studytime);
-    student* new = StopB;
-    while(new->next!=NULL){
-      new = new->next;
-    }
-    new->next = temp; //FIX UNIVERSITY LIST
-    new->next->next = NULL;
-    printLists();
-  }
-  sem_wait(&arrival);
+  printf("\nStudent %d (%s) studied for %d seconds, and now is heading to Stop B\n",id,Departments[dep],studytime);
+  StopB[id] = Departments[dep];
+  University[id] = "_";
+  printLists();
+  sem_wait(&stopb);
   printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
+  Bus[id] = Departments[dep];
+  StopB[id] = "_";
+  printLists();
+  sem_post(&stopb);
+  sem_wait(&boarding);
   printf("\nStudent %d (%s) went home.\n",id,Departments[dep]);
+  Bus[id] = "_";
+  count--;
+  printLists();
+  sem_post(&boarding);
   return NULL;
 }
 
 void* BusMove(void* vargp){
   pthread_barrier_wait(&barrier); //Wait for initialization of students
-  while(StopA!=NULL || StopB!=NULL){
+  while(count){
     sleep(3); //Bus waits 3 seconds to stop A
     puts("\nBus is on the way to University");
     //sem_wait(&nextroute);
@@ -218,6 +143,7 @@ void* BusMove(void* vargp){
     sleep(T); //Bus is moving
     puts("\nBus arrived at stop A");
     sem_post(&nextroute);
+    sem_post(&boarding);
   }
   return NULL;
 }
@@ -237,6 +163,12 @@ int main(){
   sem_init(&boarding,0,0);
   sem_init(&nextroute,0,0);
   sem_init(&stopb,0,0);
+  for(i=0;i<200;i++){
+    StopA[i] = "\0";
+    Bus[i] = "\0";
+    StopB[i] = "\0";
+    University[i] = "\0";
+  }
   if(pthread_create(&bus,NULL,BusMove,NULL)!=0){
     perror("Failed to create bus thread\n");
   }
