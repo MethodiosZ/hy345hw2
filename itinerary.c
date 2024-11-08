@@ -87,42 +87,56 @@ void* Studying(void* vargp){
     printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
     Bus[id] = Departments[dep];
     StopA[id] = "_";
+    pthread_mutex_lock(&mutex);
     printLists();
+    pthread_mutex_unlock(&mutex);
   } else {
     printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
     Bus[id] = Departments[dep];
     StopA[id] = "_";
     MaxDepInBus[dep]++;
     globalpos++;
+    pthread_mutex_lock(&mutex);
     printLists();
+    pthread_mutex_unlock(&mutex);
     sem_post(&boarding);
   }
   sem_wait(&arrival);
   printf("\nStudent %d (%s) got off the bus.\n",id,Departments[dep]);
   StopB[id] = Departments[dep];
   Bus[id] = "_";
+  pthread_mutex_lock(&mutex);
   printLists();
+  pthread_mutex_unlock(&mutex);
   sem_post(&arrival);
   printf("\nStudent %d (%s) went to University.\n",id,Departments[dep]);
   StopB[id] = "_";
   University[id] = Departments[dep];
+  pthread_mutex_lock(&mutex);
   printLists();
+  pthread_mutex_unlock(&mutex);
   sleep(studytime);
   printf("\nStudent %d (%s) studied for %d seconds, and now is heading to Stop B\n",id,Departments[dep],studytime);
   StopB[id] = Departments[dep];
   University[id] = "_";
+  pthread_mutex_lock(&mutex);
   printLists();
+  pthread_mutex_unlock(&mutex);
   sem_wait(&stopb);
   printf("\nStudent %d (%s) boarded to the bus.\n",id,Departments[dep]);
   Bus[id] = Departments[dep];
   StopB[id] = "_";
+  pthread_mutex_lock(&mutex);
   printLists();
+  pthread_mutex_unlock(&mutex);
   sem_post(&stopb);
   sem_wait(&boarding);
   printf("\nStudent %d (%s) went home.\n",id,Departments[dep]);
   Bus[id] = "_";
   count--;
+  pthread_mutex_lock(&mutex);
   printLists();
+  pthread_mutex_unlock(&mutex);
   sem_post(&boarding);
   return NULL;
 }
@@ -132,14 +146,17 @@ void* BusMove(void* vargp){
   while(count){
     sleep(3); //Bus waits 3 seconds to stop A
     puts("\nBus is on the way to University");
-    //sem_wait(&nextroute);
     sleep(T); //Bus is moving
     puts("\nBus arrived at University");
+    sem_post(&stopb);
+    pthread_mutex_lock(&mutex);
     printLists();
+    pthread_mutex_unlock(&mutex);
     sem_post(&arrival);
     sleep(3); //Bus waits 3 seconds to stop B
     puts("\nBus is on the way to stop A");
-    //sem_wait(&arrival);
+    sem_wait(&stopb);
+    sem_wait(&arrival);
     sleep(T); //Bus is moving
     puts("\nBus arrived at stop A");
     sem_post(&nextroute);
